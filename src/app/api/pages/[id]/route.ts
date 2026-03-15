@@ -1,8 +1,3 @@
-/**
- * PATCH  /api/users/[id]  — update user role (admin limited, super-admin full)
- * DELETE /api/users/[id]  — delete user (super-admin only)
- */
-
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import connectDB from "@/lib/db";
@@ -13,12 +8,9 @@ import UserModel from "@/models/User";
 import { createAuditLog } from "@/models/AuditLog";
 
 const UpdateUserSchema = z.object({
-  // Use hyphen "super-admin" — matches rbac.ts Role type
   role: z.enum(["viewer", "editor", "admin", "super-admin"]).optional(),
   name: z.string().min(1).max(100).optional(),
 });
-
-// ─── PATCH /api/users/[id] ────────────────────────────────────────────────────
 
 export async function PATCH(
   req: NextRequest,
@@ -28,6 +20,7 @@ export async function PATCH(
     await connectDB();
     const actor = await requireAuth();
 
+    // "user:read" is the minimum — admins and super-admins have it
     if (!can(actor.role, "user:read")) {
       throw new ForbiddenError();
     }
@@ -40,10 +33,9 @@ export async function PATCH(
       );
     }
 
-    // Prevent self-modification
     if (target._id.toString() === actor.id) {
       return NextResponse.json(
-        { success: false, error: "You cannot modify your own account" },
+        { success: false, error: "Cannot modify your own account" },
         { status: 403 }
       );
     }
@@ -88,8 +80,6 @@ export async function PATCH(
   }
 }
 
-// ─── DELETE /api/users/[id] ───────────────────────────────────────────────────
-
 export async function DELETE(
   _req: NextRequest,
   { params }: { params: { id: string } }
@@ -98,6 +88,7 @@ export async function DELETE(
     await connectDB();
     const actor = await requireAuth();
 
+    // Only super-admin can delete users
     if (!can(actor.role, "user:manage")) {
       throw new ForbiddenError();
     }
