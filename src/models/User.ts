@@ -66,7 +66,7 @@ const UserSchema = new Schema<IUser>(
   {
     timestamps: true,
     toJSON: {
-      transform(_, ret) {
+      transform(_, ret: Record<string, any>) {
         ret.id = ret._id?.toString();
         delete ret.password;   // belt-and-suspenders
         delete ret.__v;

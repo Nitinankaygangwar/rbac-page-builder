@@ -14,19 +14,20 @@ export interface IAuditLog extends Document {
 
 const AuditLogSchema = new Schema<IAuditLog>(
   {
-    userId: { type: Schema.Types.ObjectId, ref: "User", required: true },
-    userName: { type: String, required: true },
-    action: { type: String, required: true }, // e.g. "page.publish"
-    resource: { type: String, required: true }, // e.g. "page"
+    userId:     { type: Schema.Types.ObjectId, ref: "User", required: true },
+    userName:   { type: String, required: true },
+    action:     { type: String, required: true },
+    resource:   { type: String, required: true },
     resourceId: String,
-    details: Schema.Types.Mixed,
-    ip: String,
+    details:    Schema.Types.Mixed,
+    ip:         String,
   },
   {
     timestamps: true,
     toJSON: {
-      transform(_doc, ret) {
-        ret.id = ret._id.toString();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      transform(_doc, ret: Record<string, any>) {
+        ret.id     = ret._id?.toString();
         ret.userId = ret.userId?.toString();
         delete ret.__v;
         return ret;
@@ -50,8 +51,7 @@ export async function createAuditLog(data: {
   try {
     await AuditLogModel.create(data);
   } catch {
-    // Audit log failures should never break the main flow
-    console.error("Failed to create audit log", data.action);
+    console.error("Failed to create audit log:", data.action);
   }
 }
 
