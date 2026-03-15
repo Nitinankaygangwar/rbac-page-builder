@@ -6,16 +6,16 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import connectDB from "@/lib/db/connect";
+import connectDB from "@/lib/db";
 import { requireAuth, ForbiddenError } from "@/lib/auth/guard";
 import {
-  hasPermission,
+  can,
   canEditPage,
   canDeletePage,
-} from "@/lib/rbac/permissions";
+} from "@/lib/rbac";
 import PageModel from "@/models/Page";
 import { createAuditLog } from "@/models/AuditLog";
-import type { PageStatus } from "@/types";
+import type { PageStatus } from "@/models/Page";
 
 const UpdatePageSchema = z.object({
   title: z.string().min(1).max(200).optional(),
@@ -120,7 +120,7 @@ export async function PATCH(
 
     if (Object.keys(rest).length > 0) {
       Object.assign(page, rest);
-      page.lastEditedById = user.id as unknown as typeof page.lastEditedById;
+      page.lastEditedById = user.id;
       page.lastEditedByName = user.name;
     }
 
@@ -216,7 +216,7 @@ async function checkStatusTransition(
 ) {
   // Publishing requires explicit permission
   if (next === "published" || next === "archived") {
-    if (!hasPermission(role as never, "page:publish")) {
+    if (!can(role as never, "page:publish")) {
       throw new ForbiddenError("Only admins can publish or archive pages");
     }
     return;
@@ -227,7 +227,7 @@ async function checkStatusTransition(
     if (role === "editor" && authorId !== userId) {
       throw new ForbiddenError("Editors can only preview their own pages");
     }
-    if (!hasPermission(role as never, "page:edit")) {
+    if (!can(role as never, "page:edit")) {
       throw new ForbiddenError("Insufficient permissions for status change");
     }
     return;

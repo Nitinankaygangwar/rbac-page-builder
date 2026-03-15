@@ -10,6 +10,8 @@ export interface IPage extends Document {
   authorId: mongoose.Types.ObjectId;
   authorName: string;
   authorRole: string;
+  lastEditedById?: string;
+  lastEditedByName?: string;
   publishedAt?: Date | null;
   createdAt: Date;
   updatedAt: Date;
@@ -17,18 +19,20 @@ export interface IPage extends Document {
 
 const PageSchema = new Schema<IPage>(
   {
-    title: { type: String, required: true, trim: true, maxlength: 200 },
-    slug: { type: String, required: true, unique: true, lowercase: true, trim: true },
-    content: { type: String, default: "" },
+    title:      { type: String, required: true, trim: true, maxlength: 200 },
+    slug:       { type: String, required: true, unique: true, lowercase: true, trim: true },
+    content:    { type: String, default: "" },
     status: {
       type: String,
       enum: ["draft", "preview", "published", "archived"],
       default: "draft",
     },
-    authorId: { type: Schema.Types.ObjectId, ref: "User", required: true },
-    authorName: { type: String, required: true },
-    authorRole: { type: String, required: true },
-    publishedAt: { type: Date, default: null },
+    authorId:         { type: Schema.Types.ObjectId, ref: "User", required: true },
+    authorName:       { type: String, required: true },
+    authorRole:       { type: String, required: true },
+    lastEditedById:   { type: String },
+    lastEditedByName: { type: String },
+    publishedAt:      { type: Date, default: null },
   },
   { timestamps: true }
 );
