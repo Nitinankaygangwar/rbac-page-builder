@@ -1,0 +1,61 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --color-bg: #0e0e08;
+  --color-surface: #1a1a12;
+  --color-border: #2a2a20;
+  --color-text: #e8e8e0;
+  --color-muted: #888878;
+  --color-accent: #f59e0b;
+}
+
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+
+body {
+  background-color: var(--color-bg);
+  color: var(--color-text);
+  line-height: 1.6;
+}
+
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: #1a1a12; }
+::-webkit-scrollbar-thumb { background: #3a3a2e; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #888878; }
+
+::selection { background: rgba(245,158,11,0.25); color: #fde68a; }
+:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+
+/* TipTap */
+.tiptap-editor-content { outline: none; min-height: 340px; }
+.tiptap-editor-content p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left; color: #555548; pointer-events: none; height: 0;
+}
+.tiptap-editor-content h1 { font-family: 'Playfair Display', serif; font-size: 2rem; font-weight: 700; color: #f5f5f0; margin: 1.25rem 0 0.5rem; line-height: 1.2; }
+.tiptap-editor-content h2 { font-family: 'Playfair Display', serif; font-size: 1.5rem; font-weight: 600; color: #e8e8e0; margin: 1rem 0 0.4rem; }
+.tiptap-editor-content h3 { font-size: 1.125rem; font-weight: 600; color: #d0d0c4; margin: 0.8rem 0 0.3rem; }
+.tiptap-editor-content blockquote { border-left: 3px solid #f59e0b; padding: 0.5rem 1rem 0.5rem 1.25rem; margin: 1rem 0; background: rgba(245,158,11,0.05); border-radius: 0 6px 6px 0; color: #888878; font-style: italic; }
+.tiptap-editor-content code { font-family: 'JetBrains Mono', monospace; background: rgba(255,255,255,0.07); padding: 0.15em 0.4em; border-radius: 3px; font-size: 0.875em; color: #34d399; }
+.tiptap-editor-content pre { background: #0a0a06; border: 1px solid #2a2a20; border-radius: 8px; padding: 1rem; overflow-x: auto; }
+.tiptap-editor-content a { color: #f59e0b; text-decoration: underline; text-underline-offset: 3px; }
+.tiptap-editor-content ul, .tiptap-editor-content ol { padding-left: 1.5rem; margin: 0.5rem 0; }
+.tiptap-editor-content li { margin: 0.2rem 0; }
+.tiptap-editor-content hr { border: none; border-top: 1px solid #2a2a20; margin: 1.25rem 0; }
+
+/* Prose content (viewer) */
+.prose-content h1 { font-family: 'Playfair Display', serif; font-size: 2rem; font-weight: 700; color: #f5f5f0; margin: 1.5rem 0 0.75rem; }
+.prose-content h2 { font-family: 'Playfair Display', serif; font-size: 1.5rem; font-weight: 600; color: #e8e8e0; margin: 1.25rem 0 0.5rem; }
+.prose-content p { margin: 0.75rem 0; color: #d0d0c4; }
+.prose-content blockquote { border-left: 3px solid #f59e0b; padding: 0.5rem 1rem 0.5rem 1.25rem; margin: 1rem 0; background: rgba(245,158,11,0.05); border-radius: 0 6px 6px 0; color: #888878; font-style: italic; }
+.prose-content code { font-family: 'JetBrains Mono', monospace; background: rgba(255,255,255,0.07); padding: 0.15em 0.4em; border-radius: 3px; font-size: 0.875em; color: #34d399; }
+.prose-content a { color: #f59e0b; }
+.prose-content ul, .prose-content ol { padding-left: 1.5rem; margin: 0.5rem 0; }
+
+/* Animations */
+@keyframes fadeIn  { from { opacity: 0; } to { opacity: 1; } }
+@keyframes slideUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+.animate-fade-in  { animation: fadeIn  0.35s ease-out forwards; }
+.animate-slide-up { animation: slideUp 0.3s  ease-out forwards; }
