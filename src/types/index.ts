@@ -1,57 +1,17 @@
-// ─── Roles ────────────────────────────────────────────────────────────────────
-
-export type Role = "viewer" | "editor" | "admin" | "super_admin";
-
-export const ROLES: Record<string, Role> = {
-  VIEWER: "viewer",
-  EDITOR: "editor",
-  ADMIN: "admin",
-  SUPER_ADMIN: "super_admin",
-} as const;
-
-export const ROLE_HIERARCHY: Record<Role, number> = {
-  viewer: 1,
-  editor: 2,
-  admin: 3,
-  super_admin: 4,
-};
-
-// ─── Permissions ──────────────────────────────────────────────────────────────
-
-export type Permission =
-  | "page:read"
-  | "page:create"
-  | "page:edit"
-  | "page:delete"
-  | "page:publish"
-  | "page:unpublish"
-  | "user:read"
-  | "user:create"
-  | "user:update"
-  | "user:delete"
-  | "user:assign_role"
-  | "settings:read"
-  | "settings:update"
-  | "audit:read";
+// Re-export everything from rbac.ts as the single source of truth
+// This eliminates the duplicate Role type conflict
+export type { Role, Permission } from "@/lib/rbac";
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export type PageStatus = "draft" | "preview" | "published" | "archived";
-
-export interface PageBlock {
-  id: string;
-  type: "heading" | "paragraph" | "image" | "quote" | "divider" | "columns";
-  content: string;
-  attrs?: Record<string, unknown>;
-}
 
 export interface Page {
   _id: string;
   title: string;
   slug: string;
   status: PageStatus;
-  content: string; // TipTap JSON stringified
-  blocks?: PageBlock[];
+  content: string;
   authorId: string;
   authorName: string;
   lastEditedById?: string;
@@ -61,13 +21,9 @@ export interface Page {
   updatedAt: string;
 }
 
-export interface PageFormData {
-  title: string;
-  slug: string;
-  content: string;
-}
-
 // ─── User ─────────────────────────────────────────────────────────────────────
+
+import type { Role } from "@/lib/rbac";
 
 export interface User {
   _id: string;
@@ -78,10 +34,12 @@ export interface User {
   updatedAt: string;
 }
 
-export interface UserFormData {
+// ─── Session ──────────────────────────────────────────────────────────────────
+
+export interface SessionUser {
+  id: string;
   name: string;
   email: string;
-  password?: string;
   role: Role;
 }
 
@@ -100,15 +58,6 @@ export interface PaginatedResponse<T> {
   page: number;
   limit: number;
   totalPages: number;
-}
-
-// ─── Session ──────────────────────────────────────────────────────────────────
-
-export interface SessionUser {
-  id: string;
-  name: string;
-  email: string;
-  role: Role;
 }
 
 // ─── Audit ────────────────────────────────────────────────────────────────────
