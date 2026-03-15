@@ -12,7 +12,7 @@ import {
   ChevronRight,
   ShieldCheck,
 } from "lucide-react";
-import { hasPermission } from "@/lib/rbac/permissions";
+import { can } from "@/lib/rbac";
 import type { SessionUser } from "@/types";
 import { cn } from "@/lib/utils";
 
@@ -20,7 +20,7 @@ const ROLE_COLORS: Record<string, string> = {
   viewer: "text-ink-400",
   editor: "text-sky-400",
   admin: "text-amber-400",
-  super_admin: "text-rose-400",
+  "super-admin": "text-rose-400",
 };
 
 export default function Sidebar({ user }: { user: SessionUser }) {
@@ -38,12 +38,10 @@ export default function Sidebar({ user }: { user: SessionUser }) {
       label: "Pages",
       icon: FileText,
     },
-    ...(hasPermission(user.role, "user:read")
+    ...(can(user.role, "user:read")
       ? [{ href: "/dashboard/users", label: "Users", icon: Users }]
       : []),
-    ...(hasPermission(user.role, "settings:read")
-      ? [{ href: "/dashboard/settings", label: "Settings", icon: Settings }]
-      : []),
+
   ];
 
   return (

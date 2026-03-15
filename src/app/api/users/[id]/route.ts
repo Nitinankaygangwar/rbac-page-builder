@@ -1,22 +1,16 @@
-/**
- * PATCH  /api/users/[id]  — update user role (super_admin / admin limited)
- * DELETE /api/users/[id]  — delete user (super_admin only)
- */
-
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import connectDB from "@/lib/db/connect";
+import connectDB from "@/lib/db";
 import { requireAuth, ForbiddenError } from "@/lib/auth/guard";
-import { hasPermission, assignableRoles } from "@/lib/rbac/permissions";
+import { can, assignableRoles } from "@/lib/rbac";
+import type { Role } from "@/lib/rbac";
 import UserModel from "@/models/User";
 import { createAuditLog } from "@/models/AuditLog";
 
 const UpdateUserSchema = z.object({
-  role: z.enum(["viewer", "editor", "admin", "super_admin"]).optional(),
+  role: z.enum(["viewer", "editor", "admin", "super-admin"]).optional(),
   name: z.string().min(1).max(100).optional(),
 });
-
-// ─── PATCH /api/users/[id] ────────────────────────────────────────────────────
 
 export async function PATCH(
   req: NextRequest,
@@ -26,7 +20,8 @@ export async function PATCH(
     await connectDB();
     const actor = await requireAuth();
 
-    if (!hasPermission(actor.role, "user:update")) {
+    // "user:read" is the minimum — admins and super-admins have it
+    if (!can(actor.role, "user:read")) {
       throw new ForbiddenError();
     }
 
@@ -38,10 +33,9 @@ export async function PATCH(
       );
     }
 
-    // Prevent self-demotion
-    if (target._id.toString() === actor.id && actor.role === "super_admin") {
+    if (target._id.toString() === actor.id) {
       return NextResponse.json(
-        { success: false, error: "Super admins cannot modify themselves" },
+        { success: false, error: "Cannot modify your own account" },
         { status: 403 }
       );
     }
@@ -57,12 +51,10 @@ export async function PATCH(
 
     if (parsed.data.role) {
       const allowed = assignableRoles(actor.role);
-      if (!allowed.includes(parsed.data.role)) {
-        throw new ForbiddenError(
-          `Cannot assign role '${parsed.data.role}'`
-        );
+      if (!allowed.includes(parsed.data.role as Role)) {
+        throw new ForbiddenError(`Cannot assign role '${parsed.data.role}'`);
       }
-      target.role = parsed.data.role;
+      target.role = parsed.data.role as Role;
     }
 
     if (parsed.data.name) target.name = parsed.data.name;
@@ -88,8 +80,6 @@ export async function PATCH(
   }
 }
 
-// ─── DELETE /api/users/[id] ───────────────────────────────────────────────────
-
 export async function DELETE(
   _req: NextRequest,
   { params }: { params: { id: string } }
@@ -98,7 +88,8 @@ export async function DELETE(
     await connectDB();
     const actor = await requireAuth();
 
-    if (!hasPermission(actor.role, "user:delete")) {
+    // Only super-admin can delete users
+    if (!can(actor.role, "user:manage")) {
       throw new ForbiddenError();
     }
 

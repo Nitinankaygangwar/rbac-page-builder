@@ -1,16 +1,74 @@
+/**
+ * GET    /api/pages/[id]  — get single page
+ * PATCH  /api/pages/[id]  — update page (content, status)
+ * DELETE /api/pages/[id]  — delete page (admin+)
+ */
+
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import connectDB from "@/lib/db";
 import { requireAuth, ForbiddenError } from "@/lib/auth/guard";
-import { can, assignableRoles } from "@/lib/rbac";
-import type { Role } from "@/lib/rbac";
-import UserModel from "@/models/User";
+import {
+  can,
+  canEditPage,
+  canDeletePage,
+} from "@/lib/rbac";
+import PageModel from "@/models/Page";
 import { createAuditLog } from "@/models/AuditLog";
+import type { PageStatus } from "@/models/Page";
 
-const UpdateUserSchema = z.object({
-  role: z.enum(["viewer", "editor", "admin", "super-admin"]).optional(),
-  name: z.string().min(1).max(100).optional(),
+const UpdatePageSchema = z.object({
+  title: z.string().min(1).max(200).optional(),
+  slug: z
+    .string()
+    .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/)
+    .optional(),
+  content: z.string().optional(),
+  status: z.enum(["draft", "preview", "published", "archived"]).optional(),
 });
+
+// ─── GET /api/pages/[id] ──────────────────────────────────────────────────────
+
+export async function GET(
+  _req: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  try {
+    await connectDB();
+
+    const page = await PageModel.findById(params.id).lean();
+    if (!page) {
+      return NextResponse.json(
+        { success: false, error: "Page not found" },
+        { status: 404 }
+      );
+    }
+
+    // Published pages are public; others require auth
+    if (page.status !== "published") {
+      const user = await requireAuth();
+      if (
+        user.role === "viewer" ||
+        (user.role === "editor" && page.authorId.toString() !== user.id)
+      ) {
+        return NextResponse.json(
+          { success: false, error: "Insufficient permissions" },
+          { status: 403 }
+        );
+      }
+    }
+
+    return NextResponse.json({ success: true, data: page });
+  } catch (err: unknown) {
+    const error = err as { statusCode?: number; message?: string };
+    return NextResponse.json(
+      { success: false, error: error.message ?? "Server error" },
+      { status: error.statusCode ?? 500 }
+    );
+  }
+}
+
+// ─── PATCH /api/pages/[id] ────────────────────────────────────────────────────
 
 export async function PATCH(
   req: NextRequest,
@@ -18,30 +76,18 @@ export async function PATCH(
 ) {
   try {
     await connectDB();
-    const actor = await requireAuth();
+    const user = await requireAuth();
 
-    // "user:read" is the minimum — admins and super-admins have it
-    if (!can(actor.role, "user:read")) {
-      throw new ForbiddenError();
-    }
-
-    const target = await UserModel.findById(params.id);
-    if (!target) {
+    const page = await PageModel.findById(params.id);
+    if (!page) {
       return NextResponse.json(
-        { success: false, error: "User not found" },
+        { success: false, error: "Page not found" },
         { status: 404 }
       );
     }
 
-    if (target._id.toString() === actor.id) {
-      return NextResponse.json(
-        { success: false, error: "Cannot modify your own account" },
-        { status: 403 }
-      );
-    }
-
     const body = await req.json();
-    const parsed = UpdateUserSchema.safeParse(body);
+    const parsed = UpdatePageSchema.safeParse(body);
     if (!parsed.success) {
       return NextResponse.json(
         { success: false, error: parsed.error.flatten() },
@@ -49,36 +95,67 @@ export async function PATCH(
       );
     }
 
-    if (parsed.data.role) {
-      const allowed = assignableRoles(actor.role);
-      if (!allowed.includes(parsed.data.role as Role)) {
-        throw new ForbiddenError(`Cannot assign role '${parsed.data.role}'`);
-      }
-      target.role = parsed.data.role as Role;
+    const { status: newStatus, ...rest } = parsed.data;
+
+    // ── Permission checks ──────────────────────────────────────────────────────
+
+    // Content / metadata edits
+    if (Object.keys(rest).length > 0) {
+      const allowed = canEditPage(user.role, page.authorId.toString(), user.id);
+      if (!allowed) throw new ForbiddenError("Cannot edit this page");
     }
 
-    if (parsed.data.name) target.name = parsed.data.name;
+    // Status transitions
+    if (newStatus) {
+      await checkStatusTransition(
+        page.status as PageStatus,
+        newStatus,
+        user.role,
+        page.authorId.toString(),
+        user.id
+      );
+    }
 
-    await target.save();
+    // ── Apply update ───────────────────────────────────────────────────────────
+
+    if (Object.keys(rest).length > 0) {
+      Object.assign(page, rest);
+      page.lastEditedById = user.id;
+      page.lastEditedByName = user.name;
+    }
+
+    if (newStatus) {
+      page.status = newStatus;
+      if (newStatus === "published" && !page.publishedAt) {
+        page.publishedAt = new Date();
+      }
+      if (newStatus === "draft") {
+        page.publishedAt = null;
+      }
+    }
+
+    await page.save();
 
     await createAuditLog({
-      userId: actor.id,
-      userName: actor.name,
-      action: "user.update",
-      resource: "user",
-      resourceId: target._id.toString(),
-      details: { newRole: parsed.data.role },
+      userId: user.id,
+      userName: user.name,
+      action: newStatus ? `page.status.${newStatus}` : "page.update",
+      resource: "page",
+      resourceId: page._id.toString(),
+      details: { title: page.title, newStatus },
     });
 
-    return NextResponse.json({ success: true, data: target.toJSON() });
+    return NextResponse.json({ success: true, data: page.toJSON() });
   } catch (err: unknown) {
     const error = err as { statusCode?: number; message?: string };
     return NextResponse.json(
-      { success: false, error: error.message },
+      { success: false, error: error.message ?? "Server error" },
       { status: error.statusCode ?? 500 }
     );
   }
 }
+
+// ─── DELETE /api/pages/[id] ───────────────────────────────────────────────────
 
 export async function DELETE(
   _req: NextRequest,
@@ -86,43 +163,81 @@ export async function DELETE(
 ) {
   try {
     await connectDB();
-    const actor = await requireAuth();
+    const user = await requireAuth();
 
-    // Only super-admin can delete users
-    if (!can(actor.role, "user:manage")) {
-      throw new ForbiddenError();
-    }
-
-    if (params.id === actor.id) {
+    const page = await PageModel.findById(params.id);
+    if (!page) {
       return NextResponse.json(
-        { success: false, error: "Cannot delete your own account" },
-        { status: 403 }
-      );
-    }
-
-    const target = await UserModel.findByIdAndDelete(params.id);
-    if (!target) {
-      return NextResponse.json(
-        { success: false, error: "User not found" },
+        { success: false, error: "Page not found" },
         { status: 404 }
       );
     }
 
+    if (!canDeletePage(user.role, page.authorId.toString(), user.id)) {
+      throw new ForbiddenError("Cannot delete this page");
+    }
+
+    await page.deleteOne();
+
     await createAuditLog({
-      userId: actor.id,
-      userName: actor.name,
-      action: "user.delete",
-      resource: "user",
+      userId: user.id,
+      userName: user.name,
+      action: "page.delete",
+      resource: "page",
       resourceId: params.id,
-      details: { email: target.email },
+      details: { title: page.title },
     });
 
-    return NextResponse.json({ success: true, message: "User deleted" });
+    return NextResponse.json({ success: true, message: "Page deleted" });
   } catch (err: unknown) {
     const error = err as { statusCode?: number; message?: string };
     return NextResponse.json(
-      { success: false, error: error.message },
+      { success: false, error: error.message ?? "Server error" },
       { status: error.statusCode ?? 500 }
     );
+  }
+}
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+/**
+ * Validates allowed status transitions per role.
+ *
+ * Allowed transitions:
+ *   editor:       draft → preview
+ *   admin+:       draft → preview → published → archived (and back)
+ */
+async function checkStatusTransition(
+  current: PageStatus,
+  next: PageStatus,
+  role: string,
+  authorId: string,
+  userId: string
+) {
+  // Publishing requires explicit permission
+  if (next === "published" || next === "archived") {
+    if (!can(role as never, "page:publish")) {
+      throw new ForbiddenError("Only admins can publish or archive pages");
+    }
+    return;
+  }
+
+  // Editors can move to preview (their own pages only)
+  if (next === "preview") {
+    if (role === "editor" && authorId !== userId) {
+      throw new ForbiddenError("Editors can only preview their own pages");
+    }
+    if (!can(role as never, "page:edit")) {
+      throw new ForbiddenError("Insufficient permissions for status change");
+    }
+    return;
+  }
+
+  // Moving back to draft — editor (own) or admin+
+  if (next === "draft") {
+    if (role === "editor" && authorId !== userId) {
+      throw new ForbiddenError("Editors can only revert their own pages");
+    }
+    return;
   }
 }
