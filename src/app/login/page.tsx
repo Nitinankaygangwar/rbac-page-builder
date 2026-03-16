@@ -53,7 +53,7 @@ export default async function LoginPage() {
         <AuthTabs />
 
         {/* ── Demo credentials ──────────────────────────────────── */}
-        {/* <div className="mt-5 p-4 rounded-xl border border-ink-800 bg-ink-900/60 backdrop-blur">
+        <div className="mt-5 p-4 rounded-xl border border-ink-800 bg-ink-900/60 backdrop-blur">
           <p className="text-[10px] font-mono text-ink-600 uppercase tracking-widest mb-3">
             Demo accounts (password: Demo1234!)
           </p>
@@ -72,7 +72,7 @@ export default async function LoginPage() {
               </div>
             ))}
           </div>
-        </div> */}
+        </div>
 
       </div>
     </main>
